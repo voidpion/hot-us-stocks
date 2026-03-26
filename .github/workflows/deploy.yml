@@ -1,0 +1,61 @@
+name: Fetch Data & Deploy to GitHub Pages
+
+on:
+  # Daily at UTC 0:00 (Beijing 8:00), Tue-Sat to cover Mon-Fri US trading days
+  schedule:
+    - cron: "0 0 * * 2-6"
+  # Also deploy on push to main
+  push:
+    branches: [main]
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch stock data
+        run: python scripts/fetch_data.py
+
+      - name: Prepare site
+        run: |
+          mkdir -p _site/css _site/js _site/data
+          cp index.html _site/
+          cp css/style.css _site/css/
+          cp js/app.js _site/js/
+          cp data/stocks.json _site/data/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "_site"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
