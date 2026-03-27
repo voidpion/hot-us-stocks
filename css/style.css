@@ -263,20 +263,33 @@ header .updated-time {
 }
 
 .info-summary {
-    flex: 1;
+    flex: 3;
     font-size: 12px;
     line-height: 1.7;
     color: var(--text-secondary);
     border-right: 1px solid var(--border);
     padding-right: 16px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    gap: 8px;
+    max-height: 96px;
+    overflow-y: auto;
+}
+
+.summary-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.12);
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .info-news {
-    flex: 1;
+    flex: 2;
     display: flex;
-    align-items: center;
     gap: 8px;
     min-width: 0;
     overflow: hidden;
@@ -291,22 +304,23 @@ header .updated-time {
     border-radius: 3px;
     white-space: nowrap;
     flex-shrink: 0;
+    height: fit-content;
+    margin-top: 2px;
 }
 
 .news-scroll-wrap {
     flex: 1;
     overflow: hidden;
     position: relative;
-    mask-image: linear-gradient(90deg, transparent 0%, black 4%, black 96%, transparent 100%);
-    -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 4%, black 96%, transparent 100%);
+    height: 72px;
+    mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 90%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 90%, transparent 100%);
 }
 
 .news-scroll {
     display: flex;
-    gap: 32px;
-    white-space: nowrap;
-    animation: scrollNews 60s linear infinite;
-    width: max-content;
+    flex-direction: column;
+    animation: scrollNewsUp 40s linear infinite;
 }
 
 .news-scroll:hover {
@@ -316,9 +330,11 @@ header .updated-time {
 .news-item {
     font-size: 12px;
     color: var(--text-secondary);
-    display: inline-flex;
+    display: flex;
     gap: 6px;
-    align-items: center;
+    align-items: baseline;
+    padding: 3px 0;
+    line-height: 1.5;
     flex-shrink: 0;
 }
 
@@ -326,11 +342,16 @@ header .updated-time {
     color: var(--text-muted);
     font-size: 10px;
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
 }
 
-@keyframes scrollNews {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
+.news-item .news-title {
+    white-space: normal;
+}
+
+@keyframes scrollNewsUp {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-50%); }
 }
 
 /* Ranked view grid */

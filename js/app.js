@@ -103,7 +103,7 @@
     function renderInfoBar() {
         // Market summary
         const summary = stockData.market_summary || "";
-        document.getElementById("infoSummary").textContent = summary;
+        document.getElementById("infoSummary").innerHTML = `<span class="summary-label">综述</span><span>${summary}</span>`;
 
         // Scrolling news
         const news = stockData.news || [];
@@ -113,7 +113,7 @@
         }
         // Duplicate items for seamless infinite scroll
         const items = news.map((n) =>
-            `<span class="news-item"><span class="news-time">${n.time}</span>${n.title}</span>`
+            `<div class="news-item"><span class="news-time">${n.time}</span><span class="news-title">${n.title}</span></div>`
         ).join("");
         document.getElementById("newsScroll").innerHTML = items + items;
     }

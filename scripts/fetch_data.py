@@ -292,7 +292,9 @@ def generate_market_summary(indices: list, us_stocks: list, cn_stocks: list) -> 
     return "".join(parts)
 
 
-def generate_ai_summary(template_summary: str, indices: list, us_stocks: list, cn_stocks: list) -> str | None:
+def generate_ai_summary(
+    template_summary: str, indices: list, us_stocks: list, cn_stocks: list, news: list[dict] | None = None
+) -> str | None:
     """Try to generate an AI-powered market summary using DeepSeek or OpenAI."""
     api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -301,29 +303,64 @@ def generate_ai_summary(template_summary: str, indices: list, us_stocks: list, c
     base_url = "https://api.deepseek.com" if os.environ.get("DEEPSEEK_API_KEY") else "https://api.openai.com"
     model = "deepseek-chat" if os.environ.get("DEEPSEEK_API_KEY") else "gpt-4o-mini"
 
-    # Build concise data for the prompt
+    # Build data context
     idx_info = ", ".join(
         f"{i['name']} {'+' if i['yesterday']['change_percent'] >= 0 else ''}{i['yesterday']['change_percent']:.2f}%"
         for i in indices
     )
-    top5 = sorted(us_stocks + cn_stocks, key=lambda s: s["yesterday"]["change_percent"], reverse=True)[:5]
-    bottom5 = sorted(us_stocks + cn_stocks, key=lambda s: s["yesterday"]["change_percent"])[:5]
-    top_info = ", ".join(f"{s['symbol']}{'+' if s['yesterday']['change_percent'] >= 0 else ''}{s['yesterday']['change_percent']:.2f}%" for s in top5)
-    bot_info = ", ".join(f"{s['symbol']}{'+' if s['yesterday']['change_percent'] >= 0 else ''}{s['yesterday']['change_percent']:.2f}%" for s in bottom5)
+
+    all_stocks = us_stocks + cn_stocks
+    top5 = sorted(all_stocks, key=lambda s: s["yesterday"]["change_percent"], reverse=True)[:5]
+    bottom5 = sorted(all_stocks, key=lambda s: s["yesterday"]["change_percent"])[:5]
+    top_info = ", ".join(
+        f"{s['name']}({s['symbol']}){'+' if s['yesterday']['change_percent'] >= 0 else ''}{s['yesterday']['change_percent']:.2f}%"
+        for s in top5
+    )
+    bot_info = ", ".join(
+        f"{s['name']}({s['symbol']}){'+' if s['yesterday']['change_percent'] >= 0 else ''}{s['yesterday']['change_percent']:.2f}%"
+        for s in bottom5
+    )
+
+    # Sector averages
+    sector_info = []
+    all_map = {s["symbol"]: s for s in us_stocks}
+    for name, symbols in SECTOR_MAP.items():
+        sector = [all_map[sym] for sym in symbols if sym in all_map]
+        if sector:
+            avg = sum(s["yesterday"]["change_percent"] for s in sector) / len(sector)
+            sector_info.append(f"{name}均涨幅{avg:+.2f}%")
+    if cn_stocks:
+        cn_avg = sum(s["yesterday"]["change_percent"] for s in cn_stocks) / len(cn_stocks)
+        sector_info.append(f"中概股均涨幅{cn_avg:+.2f}%")
+
+    # Recent news headlines
+    news_text = ""
+    if news:
+        headlines = [n["title"] for n in news[:10]]
+        news_text = f"\n近期财经要闻：\n" + "\n".join(f"- {h}" for h in headlines)
 
     prompt = (
-        f"你是美股市场分析师，请用中文写一段简短的昨日美股市场综述（80-120字），风格专业简洁。\n"
+        f"你是资深美股市场分析师，请用中文撰写一段昨日美股市场综述，200-300字，风格专业、有深度。\n\n"
+        f"要求：\n"
+        f"1. 先概述大盘走势（三大指数表现）\n"
+        f"2. 分析板块分化情况，点评表现突出的板块和个股\n"
+        f"3. 结合近期新闻，分析市场驱动因素和情绪\n"
+        f"4. 给出短期趋势判断和关注要点\n\n"
+        f"数据：\n"
         f"三大指数：{idx_info}\n"
+        f"板块表现：{', '.join(sector_info)}\n"
         f"涨幅前5：{top_info}\n"
         f"跌幅前5：{bot_info}\n"
-        f"请直接输出综述文字，不要加标题或标点以外的格式。"
+        f"模板综述：{template_summary}"
+        f"{news_text}\n\n"
+        f"请直接输出综述文字，不要加标题、分段小标题或标点以外的格式符号。用连贯的段落表达。"
     )
 
     try:
         resp = requests.post(
             f"{base_url}/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 300},
+            json={"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 600},
             timeout=30,
         )
         if resp.ok:
@@ -338,7 +375,7 @@ def generate_ai_summary(template_summary: str, indices: list, us_stocks: list, c
 def fetch_news() -> list[dict]:
     """Fetch latest US stock news from Sina Finance."""
     try:
-        url = "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2514&num=30&page=1"
+        url = "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&num=30&page=1"
         r = requests.get(url, timeout=15)
         data = r.json()
         items = data.get("result", {}).get("data", [])
@@ -350,7 +387,7 @@ def fetch_news() -> list[dict]:
             if not title:
                 continue
             ts = int(item.get("ctime", 0))
-            time_str = datetime.fromtimestamp(ts).strftime("%H:%M") if ts else ""
+            time_str = datetime.fromtimestamp(ts).strftime("%m-%d %H:%M") if ts else ""
             news.append({"title": title, "time": time_str})
         print(f"  Fetched {len(news)} news items")
         return news
@@ -370,15 +407,15 @@ def main():
         print("Error: No stock data was fetched!")
         return
 
-    # Generate market summary
-    print("\nGenerating market summary...")
-    template_summary = generate_market_summary(indices, us_stocks, cn_stocks)
-    ai_summary = generate_ai_summary(template_summary, indices, us_stocks, cn_stocks)
-    summary = ai_summary or template_summary
-
-    # Fetch news
-    print("Fetching news...")
+    # Fetch news first so AI can use it
+    print("\nFetching news...")
     news = fetch_news()
+
+    # Generate market summary
+    print("Generating market summary...")
+    template_summary = generate_market_summary(indices, us_stocks, cn_stocks)
+    ai_summary = generate_ai_summary(template_summary, indices, us_stocks, cn_stocks, news)
+    summary = ai_summary or template_summary
 
     all_stocks = indices + us_stocks + cn_stocks
     result = {
