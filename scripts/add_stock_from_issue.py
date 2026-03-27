@@ -39,7 +39,7 @@ def resolve_name(symbol: str) -> str:
 
 
 def parse_issue():
-    """Extract symbol, name, and category from issue body."""
+    """Extract symbol, name, category, and sector from issue body."""
     body = os.environ.get("ISSUE_BODY", "")
     title = os.environ.get("ISSUE_TITLE", "")
 
@@ -47,6 +47,7 @@ def parse_issue():
     symbol = ""
     name = ""
     group = "us_stocks"
+    sector = ""
 
     # Parse "### 股票代码\n\nPLTR" style fields
     symbol_match = re.search(r"###\s*股票代码\s*\n+\s*(\w+)", body)
@@ -62,17 +63,32 @@ def parse_issue():
     if "cn_stocks" in body or "中概股" in body:
         group = "cn_stocks"
 
+    sector_match = re.search(r"###\s*板块[（(]?仅美股[)）]?\s*\n+\s*(.+)", body)
+    if sector_match:
+        sector = sector_match.group(1).strip()
+        if sector in ("_No response_", "None", "其他", ""):
+            sector = ""
+
     # Fallback: try to extract from title "添加股票: PLTR"
     if not symbol:
         title_match = re.search(r"[:\s]+([A-Z]{1,5})\b", title)
         if title_match:
             symbol = title_match.group(1).upper()
 
-    return symbol, name, group
+    return symbol, name, group, sector
+
+
+SECTOR_KEY_MAP = {
+    "七巨头": "mag7",
+    "半导体": "semi",
+    "软件云": "software",
+    "互联网": "internet",
+    "金融科技": "fintech",
+}
 
 
 def main():
-    symbol, name, group = parse_issue()
+    symbol, name, group, sector = parse_issue()
 
     if not symbol:
         set_output("added", "false")
@@ -116,6 +132,14 @@ def main():
     else:
         config[group].append(symbol)
 
+    # Add to sector if specified
+    sector_key = SECTOR_KEY_MAP.get(sector, "")
+    if sector_key:
+        sectors = config.setdefault("sectors", {})
+        sec = sectors.setdefault(sector_key, {"name": sector, "symbols": []})
+        if symbol not in sec["symbols"]:
+            sec["symbols"].append(symbol)
+
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
@@ -123,7 +147,8 @@ def main():
     set_output("symbol", symbol)
     set_output("name", display_name)
     set_output("group", group)
-    print(f"Added {symbol} ({display_name}) to {group}")
+    set_output("sector", sector_key)
+    print(f"Added {symbol} ({display_name}) to {group}" + (f" [{sector}]" if sector else ""))
 
 
 if __name__ == "__main__":

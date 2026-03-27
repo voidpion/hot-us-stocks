@@ -28,6 +28,20 @@ body:
         - cn_stocks (中概股)
     validations:
       required: true
+  - type: dropdown
+    id: sector
+    attributes:
+      label: 板块（仅美股）
+      description: 选择所属板块，便于筛选归类
+      options:
+        - 七巨头
+        - 半导体
+        - 软件云
+        - 互联网
+        - 金融科技
+        - 其他
+    validations:
+      required: false
   - type: textarea
     id: reason
     attributes:

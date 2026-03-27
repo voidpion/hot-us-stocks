@@ -1,12 +1,6 @@
 (() => {
     "use strict";
 
-    const INDEX_COLORS = [
-        { line: "#3b82f6", bg: "rgba(59, 130, 246, 0.06)" },  // SPY - blue
-        { line: "#f59e0b", bg: "rgba(245, 158, 11, 0.06)" },  // DIA - amber
-        { line: "#8b5cf6", bg: "rgba(139, 92, 246, 0.06)" },  // QQQ - purple
-    ];
-
     let stockData = null;
     let allStocks = [];
     let chart = null;
@@ -15,7 +9,40 @@
     let isIndexView = true;
     let activeCategory = "all";
     let activeSort = null;
+    let activeTags = new Set(); // active tag filter texts
     let sparklineMode = "intraday"; // "intraday" | "daily" | "monthly"
+    let activeIndexIdx = -1; // which index is selected (-1 = auto-detect QQQ)
+
+    // === Color Mode ===
+    const COLOR_MODE_KEY = "hot-us-stocks-color-mode";
+
+    function getColors() {
+        const style = getComputedStyle(document.documentElement);
+        return {
+            green: style.getPropertyValue("--green").trim(),
+            red: style.getPropertyValue("--red").trim(),
+        };
+    }
+
+    function setupColorMode() {
+        // Restore saved preference
+        if (localStorage.getItem(COLOR_MODE_KEY) === "cn") {
+            document.documentElement.classList.add("cn-color");
+        }
+
+        document.getElementById("colorModeBtn").addEventListener("click", () => {
+            document.documentElement.classList.toggle("cn-color");
+            const isCN = document.documentElement.classList.contains("cn-color");
+            localStorage.setItem(COLOR_MODE_KEY, isCN ? "cn" : "us");
+            // Re-render everything that uses colors
+            applyFilter();
+            if (isIndexView) {
+                showIndicesChart();
+            } else if (selectedStock) {
+                updateSingleChart();
+            }
+        });
+    }
 
     // === Watchlist (localStorage) ===
     const WATCHLIST_KEY = "hot-us-stocks-watchlist";
@@ -97,13 +124,15 @@
 
     window.__toggleWatch = toggleWatchlist;
 
-    const CATEGORIES = {
+    // Populated from data/stocks.json at runtime, with fallback
+    const DEFAULT_CATEGORIES = {
         mag7: ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"],
-        semi: ["AMD", "AVGO", "INTC", "QCOM", "MU"],
-        software: ["CRM", "ORCL", "ADBE", "NOW"],
-        internet: ["NFLX", "UBER", "ABNB", "SNAP"],
+        semi: ["AMD", "AVGO", "INTC", "QCOM", "MU", "TSM", "ARM", "MRVL", "SMCI", "DELL", "WDC"],
+        software: ["CRM", "ORCL", "ADBE", "NOW", "PLTR", "SNOW", "CRWD", "PANW"],
+        internet: ["NFLX", "UBER", "ABNB", "SNAP", "SPOT", "SHOP", "RBLX", "RIVN"],
         fintech: ["V", "PYPL", "SQ", "COIN"],
     };
+    let CATEGORIES = DEFAULT_CATEGORIES;
 
     // === Data Loading ===
 
@@ -120,6 +149,14 @@
                 ...(stockData.us_stocks || []),
                 ...(stockData.cn_stocks || []),
             ];
+            // Build CATEGORIES from JSON data (fallback to defaults)
+            const cats = stockData.categories;
+            if (cats && Object.keys(cats).length) {
+                CATEGORIES = {};
+                for (const [key, val] of Object.entries(cats)) {
+                    CATEGORIES[key] = val.symbols || [];
+                }
+            }
             render();
         } catch (err) {
             usGrid.innerHTML = `<div class="error-message">${err.message}</div>`;
@@ -131,6 +168,7 @@
     function render() {
         renderHeader();
         renderInfoBar();
+        buildTagFilterBar();
         renderStockGrid("usStockGrid", stockData.us_stocks || []);
         renderStockGrid("cnStockGrid", stockData.cn_stocks || []);
         renderStatsBar();
@@ -342,9 +380,10 @@
 
             const { labels, prices } = getSparklineData(stock);
 
-            const isUp = prices.length >= 2 && prices[prices.length - 1] >= prices[0];
-            const lineColor = isUp ? "#059669" : "#dc2626";
-            const bgColor = isUp ? "rgba(5, 150, 105, 0.1)" : "rgba(220, 38, 38, 0.08)";
+            const isUp = stock.yesterday.change >= 0;
+            const c = getColors();
+            const lineColor = isUp ? c.green : c.red;
+            const bgColor = isUp ? c.green + "1a" : c.red + "14";
 
             if (sparklineCharts[stock.symbol]) {
                 sparklineCharts[stock.symbol].destroy();
@@ -403,15 +442,39 @@
 
     window.__showIndices = showIndicesChart;
 
+    const INDEX_ORDER = ["QQQ", ".IXIC", "DIA", ".DJI"];
+
     function renderIndexDetails() {
         const indices = stockData.indices || [];
-        const html = indices.map((idx) => {
+        // Sort: NASDAQ first, then Dow, then rest
+        indices.sort((a, b) => {
+            const ai = INDEX_ORDER.indexOf(a.symbol);
+            const bi = INDEX_ORDER.indexOf(b.symbol);
+            return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+        });
+        // Default to first (NASDAQ) if not set
+        if (activeIndexIdx < 0) {
+            activeIndexIdx = 0;
+        }
+        const html = indices.map((idx, i) => {
             const d = idx.yesterday;
             const sign = d.change >= 0 ? "+" : "";
             const cls = d.change >= 0 ? "positive" : "negative";
-            return `<span class="idx-tag ${cls}"><b>${idx.name}</b> $${d.close.toFixed(2)} ${sign}${d.change_percent.toFixed(2)}%</span>`;
+            const active = i === activeIndexIdx ? " active" : "";
+            return `<span class="idx-tag ${cls}${active}" data-idx="${i}"><b>${idx.name}</b> ${sign}${d.change_percent.toFixed(2)}%</span>`;
         }).join("");
         document.getElementById("chartDetails").innerHTML = html;
+    }
+
+    function setupIndexToggle() {
+        document.getElementById("chartDetails").addEventListener("click", (e) => {
+            const tag = e.target.closest(".idx-tag");
+            if (!tag || !isIndexView) return;
+            activeIndexIdx = parseInt(tag.dataset.idx);
+            const el = document.getElementById("chartDetails");
+            el.querySelectorAll(".idx-tag").forEach((t, i) => t.classList.toggle("active", i === activeIndexIdx));
+            updateIndexChart();
+        });
     }
 
     function getCutoffDate(range, refDate) {
@@ -440,79 +503,43 @@
     }
 
     function updateIndexIntradayChart(indices) {
-        // Use intraday data — normalize to % change from prev_close
-        const datasets = indices.map((idx, i) => {
-            const intraday = idx.intraday || [];
-            const base = idx.yesterday.prev_close;
-            return {
-                label: idx.name,
-                data: intraday.map((d) => ((d.close - base) / base * 100)),
-                borderColor: INDEX_COLORS[i].line,
-                backgroundColor: INDEX_COLORS[i].bg,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                pointHoverBackgroundColor: INDEX_COLORS[i].line,
-                fill: false,
-                tension: 0.3,
-            };
-        });
+        const idx = indices[activeIndexIdx] || indices[0];
+        const intraday = idx.intraday || [];
+        const base = idx.yesterday.prev_close;
+        const prices = intraday.map((d) => d.close);
+        const labels = intraday.map((d) => d.time);
 
-        const labels = (indices[0].intraday || []).map((d) => d.time);
-        drawIndexChart(labels, datasets, true);
-    }
+        const isUp = idx.yesterday.change >= 0;
+        const cc = getColors();
+        const lineColor = isUp ? cc.green : cc.red;
+        const bgColor = isUp ? cc.green + "0f" : cc.red + "0a";
 
-    function updateIndexDailyChart(indices) {
-        const refHistory = indices[0].history;
-        const refDate = new Date(refHistory[refHistory.length - 1].date);
-        const cutoff = getCutoffDate(selectedRange, refDate);
-
-        const datasets = indices.map((idx, i) => {
-            const filtered = idx.history.filter((d) => new Date(d.date) >= cutoff);
-            const basePrice = filtered.length > 0 ? filtered[0].close : 1;
-            return {
-                label: idx.name,
-                data: filtered.map((d) => ((d.close - basePrice) / basePrice * 100)),
-                borderColor: INDEX_COLORS[i].line,
-                backgroundColor: INDEX_COLORS[i].bg,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                pointHoverBackgroundColor: INDEX_COLORS[i].line,
-                fill: false,
-                tension: 0.2,
-            };
-        });
-
-        const filtered0 = indices[0].history.filter((d) => new Date(d.date) >= cutoff);
-        const labels = filtered0.map((d) => d.date);
-        drawIndexChart(labels, datasets, false);
-    }
-
-    function drawIndexChart(labels, datasets, isIntraday) {
         const ctx = document.getElementById("stockChart").getContext("2d");
         if (chart) chart.destroy();
 
         chart = new Chart(ctx, {
             type: "line",
-            data: { labels, datasets },
+            data: {
+                labels,
+                datasets: [{
+                    label: idx.name,
+                    data: prices,
+                    borderColor: lineColor,
+                    backgroundColor: bgColor,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: lineColor,
+                    fill: true,
+                    tension: 0.3,
+                }],
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { intersect: false, mode: "index" },
                 plugins: {
-                    legend: {
-                        display: true,
-                        position: "top",
-                        align: "end",
-                        labels: {
-                            color: "#4b5563",
-                            font: { size: 12, weight: "600" },
-                            boxWidth: 12,
-                            boxHeight: 2,
-                            padding: 16,
-                        },
-                    },
+                    legend: { display: false },
                     tooltip: {
                         backgroundColor: "#ffffff",
                         titleColor: "#111827",
@@ -521,34 +548,20 @@
                         borderWidth: 1,
                         padding: 12,
                         callbacks: {
-                            title: (items) => items[0].label,
-                            label: (item) => {
-                                const sign = item.parsed.y >= 0 ? "+" : "";
-                                return `${item.dataset.label}: ${sign}${item.parsed.y.toFixed(2)}%`;
-                            },
+                            label: (item) => `$${item.parsed.y.toFixed(2)}`,
                         },
                     },
                 },
                 scales: {
                     x: {
                         grid: { color: "rgba(0,0,0,0.04)", drawBorder: false },
-                        ticks: {
-                            color: "#9ca3af",
-                            maxTicksLimit: isIntraday ? 12 : 8,
-                            maxRotation: 0,
-                            callback: function (val) {
-                                const lbl = this.getLabelForValue(val);
-                                if (isIntraday) return lbl;
-                                const parts = lbl.split("-");
-                                return `${parts[1]}/${parts[2]}`;
-                            },
-                        },
+                        ticks: { color: "#9ca3af", maxTicksLimit: 12, maxRotation: 0 },
                     },
                     y: {
                         grid: { color: "rgba(0,0,0,0.04)", drawBorder: false },
                         ticks: {
                             color: "#9ca3af",
-                            callback: (val) => `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`,
+                            callback: (val) => `$${val.toFixed(val >= 100 ? 0 : 2)}`,
                         },
                         position: "right",
                     },
@@ -557,9 +570,26 @@
         });
     }
 
+    function updateIndexDailyChart(indices) {
+        const idx = indices[activeIndexIdx] || indices[0];
+        const refDate = new Date(idx.history[idx.history.length - 1].date);
+        const cutoff = getCutoffDate(selectedRange, refDate);
+        const filtered = idx.history.filter((d) => new Date(d.date) >= cutoff);
+        if (filtered.length) {
+            drawCandlestickChart(filtered);
+        }
+    }
+
     // === Single Stock Selection ===
 
     function selectStock(symbol) {
+        // Toggle: click again to deselect
+        if (selectedStock && selectedStock.symbol === symbol) {
+            showIndicesChart();
+            collapseChart();
+            return;
+        }
+
         selectedStock = allStocks.find((s) => s.symbol === symbol);
         if (!selectedStock) return;
 
@@ -579,13 +609,7 @@
 
         updateSingleChart();
         renderDetails();
-
-        // Scroll to chart if out of view
-        const chartEl = document.querySelector(".chart-section");
-        const rect = chartEl.getBoundingClientRect();
-        if (rect.top < 0) {
-            chartEl.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        expandChart();
     }
 
     window.__selectStock = selectStock;
@@ -617,7 +641,8 @@
                 const yLow = chart.scales.y.getPixelForValue(d.low);
                 ctx.save();
                 ctx.beginPath();
-                ctx.strokeStyle = d.close >= d.open ? "#059669" : "#dc2626";
+                const cc = getColors();
+                ctx.strokeStyle = d.close >= d.open ? cc.green : cc.red;
                 ctx.lineWidth = 1;
                 ctx.moveTo(x, yHigh);
                 ctx.lineTo(x, yLow);
@@ -627,10 +652,11 @@
         },
     };
 
-    function drawCandlestickChart(data) {
+    function createCandlestickChart(canvas, data) {
         const labels = data.map((d) => d.date);
         const bodies = data.map((d) => [Math.min(d.open, d.close), Math.max(d.open, d.close)]);
-        const bgColors = data.map((d) => d.close >= d.open ? "#059669" : "#dc2626");
+        const cc = getColors();
+        const bgColors = data.map((d) => d.close >= d.open ? cc.green : cc.red);
 
         const allHighs = data.map((d) => d.high);
         const allLows = data.map((d) => d.low);
@@ -640,10 +666,9 @@
         const yMin = minPrice - padding;
         const yMax = maxPrice + padding;
 
-        const ctx = document.getElementById("stockChart").getContext("2d");
-        if (chart) chart.destroy();
+        const ctx = canvas.getContext("2d");
 
-        chart = new Chart(ctx, {
+        const c = new Chart(ctx, {
             type: "bar",
             data: {
                 labels,
@@ -718,7 +743,14 @@
             },
             plugins: [candlestickWicks],
         });
-        chart._ohlcData = data;
+        c._ohlcData = data;
+        return c;
+    }
+
+    function drawCandlestickChart(data) {
+        const canvas = document.getElementById("stockChart");
+        if (chart) chart.destroy();
+        chart = createCandlestickChart(canvas, data);
     }
 
     function updateSingleChart() {
@@ -737,8 +769,9 @@
         const prices = intraday.map((d) => d.close);
 
         const isUp = prices.length >= 2 && prices[prices.length - 1] >= prices[0];
-        const lineColor = isUp ? "#059669" : "#dc2626";
-        const bgColor = isUp ? "rgba(5, 150, 105, 0.06)" : "rgba(220, 38, 38, 0.04)";
+        const cc = getColors();
+        const lineColor = isUp ? cc.green : cc.red;
+        const bgColor = isUp ? cc.green + "0f" : cc.red + "0a";
 
         const ctx = document.getElementById("stockChart").getContext("2d");
         if (chart) chart.destroy();
@@ -874,6 +907,90 @@
         });
     }
 
+    // === Tag Filter ===
+
+    // Cache: symbol → tags array
+    let stockTagsCache = {};
+
+    function buildTagFilterBar() {
+        const allNonIndexStocks = [...(stockData.us_stocks || []), ...(stockData.cn_stocks || [])];
+        // Collect all unique tags and their types
+        const tagMap = new Map(); // text → type
+        stockTagsCache = {};
+        for (const stock of allNonIndexStocks) {
+            const tags = getTrendTags(stock);
+            stockTagsCache[stock.symbol] = tags;
+            for (const t of tags) {
+                // Normalize streak tags: "连涨3天" → "连涨"
+                const key = t.text.replace(/\d+天$/, "");
+                if (!tagMap.has(key)) tagMap.set(key, t.type);
+            }
+        }
+
+        const bar = document.getElementById("tagFilterBar");
+        const chips = document.getElementById("tagFilterChips");
+
+        if (!tagMap.size) {
+            bar.style.display = "none";
+            return;
+        }
+
+        bar.style.display = "";
+        chips.innerHTML = [...tagMap.entries()].map(([text, type]) =>
+            `<span class="tag-chip type-${type}" data-tag="${text}">${text}</span>`
+        ).join("");
+    }
+
+    function setupTagFilter() {
+        document.getElementById("tagFilterChips").addEventListener("click", (e) => {
+            const chip = e.target.closest(".tag-chip");
+            if (!chip) return;
+            const tag = chip.dataset.tag;
+            if (activeTags.has(tag)) {
+                activeTags.delete(tag);
+                chip.classList.remove("active");
+            } else {
+                activeTags.add(tag);
+                chip.classList.add("active");
+            }
+            updateActionBtns();
+            applyFilter();
+        });
+
+        document.getElementById("tagFilterClear").addEventListener("click", () => {
+            activeTags.clear();
+            document.querySelectorAll(".tag-chip").forEach((c) => c.classList.remove("active"));
+            updateActionBtns();
+            applyFilter();
+        });
+
+        document.getElementById("tagFilterInvert").addEventListener("click", () => {
+            const allTags = [...document.querySelectorAll(".tag-chip")].map((c) => c.dataset.tag);
+            const newSet = new Set(allTags.filter((t) => !activeTags.has(t)));
+            activeTags = newSet;
+            document.querySelectorAll(".tag-chip").forEach((c) => c.classList.toggle("active", activeTags.has(c.dataset.tag)));
+            updateActionBtns();
+            applyFilter();
+        });
+    }
+
+    function updateActionBtns() {
+        const show = activeTags.size > 0;
+        document.getElementById("tagFilterClear").classList.toggle("visible", show);
+        document.getElementById("tagFilterInvert").classList.toggle("visible", show);
+    }
+
+    function filterByTags(stocks) {
+        if (!activeTags.size) return stocks;
+        return stocks.filter((s) => {
+            const tags = stockTagsCache[s.symbol] || [];
+            return tags.some((t) => {
+                const key = t.text.replace(/\d+天$/, "");
+                return activeTags.has(key);
+            });
+        });
+    }
+
     function applyFilter() {
         const twoCol = document.getElementById("twoColSection");
         const rankedEl = document.getElementById("rankedSection");
@@ -883,7 +1000,7 @@
             twoCol.style.display = "none";
             rankedEl.style.display = "block";
             renderRankedView();
-        } else if (activeCategory === "all" && !activeSort) {
+        } else if (activeCategory === "all" && !activeSort && !activeTags.size) {
             // Default two-column view
             twoCol.style.display = "";
             rankedEl.style.display = "none";
@@ -914,7 +1031,7 @@
             const symbols = CATEGORIES[activeCategory] || [];
             stocks = (stockData.us_stocks || []).filter((s) => symbols.includes(s.symbol));
         }
-        return stocks;
+        return filterByTags(stocks);
     }
 
     function renderStatsBar() {
@@ -1033,14 +1150,43 @@
         });
     }
 
+    function expandChart() {
+        document.querySelector(".chart-section").classList.add("expanded");
+    }
+
+    function collapseChart() {
+        document.querySelector(".chart-section").classList.remove("expanded");
+    }
+
+    function setupChartCollapse() {
+        const section = document.querySelector(".chart-section");
+        let collapseTimer = null;
+
+        section.addEventListener("mouseenter", () => {
+            clearTimeout(collapseTimer);
+            expandChart();
+        });
+
+        section.addEventListener("mouseleave", () => {
+            collapseTimer = setTimeout(() => {
+                collapseChart();
+            }, 400);
+        });
+    }
+
     function init() {
         setupTimeRangeButtons();
         setupFilterButtons();
         setupSparklineToggle();
+        setupColorMode();
+        setupIndexToggle();
+        setupChartCollapse();
+        setupTagFilter();
 
         document.addEventListener("click", (e) => {
             if (!isIndexView && !e.target.closest(".stock-card") && !e.target.closest(".chart-section") && !e.target.closest(".filter-bar") && !e.target.closest(".stats-bar")) {
                 showIndicesChart();
+                collapseChart();
             }
         });
 

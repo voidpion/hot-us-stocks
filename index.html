@@ -50,6 +50,9 @@
                 <button class="spark-btn" data-spark="daily">日线</button>
                 <button class="spark-btn" data-spark="monthly">月线</button>
             </div>
+            <button class="color-mode-btn" id="colorModeBtn" title="切换红绿模式">
+                <span class="cm-up">▲</span><span class="cm-down">▼</span>
+            </button>
         </section>
 
         <!-- Market Info Bar -->
@@ -62,6 +65,13 @@
                 </div>
             </div>
         </section>
+
+        <!-- Tag Filter Bar -->
+        <div class="tag-filter-bar" id="tagFilterBar" style="display:none">
+            <div class="tag-filter-chips" id="tagFilterChips"></div>
+            <button class="tag-filter-action" id="tagFilterInvert" title="反选">反选</button>
+            <button class="tag-filter-action" id="tagFilterClear" title="清空">清空</button>
+        </div>
 
         <!-- Two-column layout: US left, China right -->
         <section class="section two-col" id="twoColSection">
@@ -78,36 +88,32 @@
         <!-- Ranked View (hidden by default) -->
         <section class="ranked-section" id="rankedSection" style="display:none"></section>
 
-        <!-- Chart Section — bottom -->
-        <section class="section chart-section">
-            <div class="chart-header">
-                <div class="chart-title-group">
-                    <button class="back-to-indices" id="backToIndices" onclick="window.__showIndices()" title="Back to indices overview">&larr;</button>
-                    <span class="chart-stock-symbol" id="chartStockSymbol"></span>
-                    <span id="chartStockName">美股三大指数</span>
-                </div>
-                <div class="chart-details-inline" id="chartDetails"></div>
-                <div class="time-range-buttons" id="timeRangeButtons">
-                    <button class="range-btn" data-range="1D">分时</button>
-                    <button class="range-btn active" data-range="D5">日线</button>
-                    <button class="range-btn" data-range="1W">周线</button>
-                    <button class="range-btn" data-range="1M">月线</button>
-                    <button class="range-btn" data-range="3M">季线</button>
-                    <button class="range-btn" data-range="6M">半年</button>
-                    <button class="range-btn" data-range="1Y">年线</button>
-                </div>
-            </div>
-            <div class="chart-container">
-                <canvas id="stockChart"></canvas>
-            </div>
-        </section>
     </main>
 
-    <footer>
-        <div class="container">
-            <p>数据来源: 新浪财经 | 每日更新</p>
+    <!-- Chart Section — fixed bottom -->
+    <section class="chart-section">
+        <div class="chart-header">
+            <div class="chart-title-group">
+                <button class="back-to-indices" id="backToIndices" onclick="window.__showIndices()" title="Back to indices overview">&larr;</button>
+                <span class="chart-stock-symbol" id="chartStockSymbol"></span>
+                <span id="chartStockName">美股三大指数</span>
+            </div>
+            <div class="chart-details-inline" id="chartDetails"></div>
+            <div class="time-range-buttons" id="timeRangeButtons">
+                <button class="range-btn" data-range="1D">分时</button>
+                <button class="range-btn active" data-range="D5">日线</button>
+                <button class="range-btn" data-range="1W">周线</button>
+                <button class="range-btn" data-range="1M">月线</button>
+                <button class="range-btn" data-range="3M">季线</button>
+                <button class="range-btn" data-range="6M">半年</button>
+                <button class="range-btn" data-range="1Y">年线</button>
+            </div>
         </div>
-    </footer>
+        <div class="chart-container">
+            <canvas id="stockChart"></canvas>
+        </div>
+        <div class="chart-footer">数据来源: 新浪财经 | 每日更新</div>
+    </section>
 
     <script src="js/app.js"></script>
 </body>

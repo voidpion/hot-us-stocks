@@ -67,8 +67,8 @@ def parse_stock_list(items: list) -> dict:
     return result
 
 
-def load_stock_config() -> tuple[dict, dict, dict]:
-    """Load stock lists from config/stocks.yaml."""
+def load_stock_config() -> tuple[dict, dict, dict, dict]:
+    """Load stock lists and sectors from config/stocks.yaml."""
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
@@ -76,7 +76,8 @@ def load_stock_config() -> tuple[dict, dict, dict]:
     indices = parse_stock_list(config.get("indices", []))
     us_stocks = parse_stock_list(config.get("us_stocks", []))
     cn_stocks = parse_stock_list(config.get("cn_stocks", []))
-    return indices, us_stocks, cn_stocks
+    sectors = config.get("sectors", {})
+    return indices, us_stocks, cn_stocks, sectors
 
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 
@@ -204,13 +205,7 @@ def fetch_group(stock_dict: dict, label: str) -> list[dict]:
     return results
 
 
-SECTOR_MAP = {
-    "七巨头": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"],
-    "半导体": ["AMD", "AVGO", "INTC", "QCOM", "MU"],
-    "软件云": ["CRM", "ORCL", "ADBE", "NOW"],
-    "互联网": ["NFLX", "UBER", "ABNB", "SNAP"],
-    "金融科技": ["V", "PYPL", "SQ", "COIN"],
-}
+SECTOR_MAP = {}  # populated from config at runtime
 
 
 def generate_market_summary(indices: list, us_stocks: list, cn_stocks: list) -> str:
@@ -398,7 +393,14 @@ def fetch_news() -> list[dict]:
 
 
 def main():
-    INDICES, US_STOCKS, CN_STOCKS = load_stock_config()
+    global SECTOR_MAP
+    INDICES, US_STOCKS, CN_STOCKS, sectors_config = load_stock_config()
+
+    # Build SECTOR_MAP from config
+    SECTOR_MAP = {v["name"]: v["symbols"] for v in sectors_config.values() if "name" in v and "symbols" in v}
+
+    # Build categories for JSON output: {key: {name, symbols}}
+    categories = {k: {"name": v["name"], "symbols": v["symbols"]} for k, v in sectors_config.items() if "name" in v}
 
     indices = fetch_group(INDICES, "US Indices")
     us_stocks = fetch_group(US_STOCKS, "US Stocks")
@@ -424,6 +426,7 @@ def main():
         "market_date": all_stocks[0]["yesterday"]["date"] if all_stocks else "",
         "market_summary": summary,
         "news": news,
+        "categories": categories,
         "indices": indices,
         "us_stocks": us_stocks,
         "cn_stocks": cn_stocks,

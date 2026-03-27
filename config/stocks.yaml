@@ -1,43 +1,89 @@
+# 热门美股行情 - 股票配置
+# 提交 PR 添加新股票，只需加股票代码即可，名称会自动获取
+# 如需自定义名称（如中文），使用 代码: 名称 格式
+# PR 会自动校验股票代码是否有效
+
+# 美股三大指数 (ETF)
 indices:
-- SPY
-- DIA
-- QQQ
+  - SPY
+  - DIA
+  - QQQ
+
+# 美股
 us_stocks:
-- AAPL
-- MSFT
-- GOOGL
-- AMZN
-- NVDA
-- META
-- TSLA
-- AMD
-- AVGO
-- INTC
-- QCOM
-- MU
-- CRM
-- ORCL
-- ADBE
-- NOW
-- NFLX
-- UBER
-- ABNB
-- SNAP
-- V
-- PYPL
-- SQ
-- COIN
-- PLTR
+  # 科技七巨头
+  - AAPL
+  - MSFT
+  - GOOGL
+  - AMZN
+  - NVDA
+  - META
+  - TSLA
+  # 半导体 & 硬件
+  - AMD
+  - AVGO
+  - INTC
+  - QCOM
+  - MU
+  - TSM
+  - ARM
+  - MRVL
+  - SMCI
+  - DELL
+  - WDC
+  # 软件 & 云 & 安全
+  - CRM
+  - ORCL
+  - ADBE
+  - NOW
+  - PLTR
+  - SNOW
+  - CRWD
+  - PANW
+  # 互联网 & 消费科技
+  - NFLX
+  - UBER
+  - ABNB
+  - SNAP
+  - SPOT
+  - SHOP
+  - RBLX
+  - RIVN
+  # 金融科技
+  - V
+  - PYPL
+  - SQ
+  - COIN
+
+# 板块分类（用于前端筛选和市场分析）
+sectors:
+  mag7:
+    name: 七巨头
+    symbols: [AAPL, MSFT, GOOGL, AMZN, NVDA, META, TSLA]
+  semi:
+    name: 半导体
+    symbols: [AMD, AVGO, INTC, QCOM, MU, TSM, ARM, MRVL, SMCI, DELL, WDC]
+  software:
+    name: 软件云
+    symbols: [CRM, ORCL, ADBE, NOW, PLTR, SNOW, CRWD, PANW]
+  internet:
+    name: 互联网
+    symbols: [NFLX, UBER, ABNB, SNAP, SPOT, SHOP, RBLX, RIVN]
+  fintech:
+    name: 金融科技
+    symbols: [V, PYPL, SQ, COIN]
+
+# 中概股（使用中文名）
 cn_stocks:
-- BABA: 阿里巴巴
-- PDD: 拼多多
-- JD: 京东
-- BIDU: 百度
-- NIO: 蔚来
-- XPEV: 小鹏汽车
-- LI: 理想汽车
-- TME: 腾讯音乐
-- BILI: 哔哩哔哩
-- IQ: 爱奇艺
-- ZH: 知乎
-- FUTU: 富途控股
+  - BABA: 阿里巴巴
+  - PDD: 拼多多
+  - JD: 京东
+  - BIDU: 百度
+  - NIO: 蔚来
+  - XPEV: 小鹏汽车
+  - LI: 理想汽车
+  - TME: 腾讯音乐
+  - BILI: 哔哩哔哩
+  - IQ: 爱奇艺
+  - ZH: 知乎
+  - FUTU: 富途控股
