@@ -75,7 +75,8 @@ def check_symbol(symbol: str) -> tuple[bool, str]:
     """Check if a symbol exists and return the real company name from Sina Finance."""
     try:
         url = f"https://hq.sinajs.cn/list=gb_{symbol.lower()}"
-        r = requests.get(url, timeout=10, verify=False)
+        headers = {"Referer": "https://finance.sina.com.cn"}
+        r = requests.get(url, timeout=10, verify=False, headers=headers)
         if '=""' in r.text or len(r.text.strip()) <= 20:
             return False, ""
         match = re.search(r'"(.+)"', r.text)

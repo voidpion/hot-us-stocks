@@ -259,7 +259,7 @@ header .updated-time {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     align-items: stretch;
-    min-height: 48px;
+    height: 100px;
 }
 
 .info-summary {
@@ -272,8 +272,7 @@ header .updated-time {
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    max-height: 120px;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .summary-label {
@@ -285,6 +284,14 @@ header .updated-time {
     border-radius: 3px;
     white-space: nowrap;
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+}
+
+.summary-text {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 100%;
 }
 
 .info-news {
@@ -313,7 +320,7 @@ header .updated-time {
     flex: 1;
     overflow: hidden;
     position: relative;
-    min-height: 48px;
+    height: 100%;
     mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 92%, transparent 100%);
     -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 92%, transparent 100%);
 }
@@ -359,7 +366,7 @@ header .updated-time {
 .ranked-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 8px;
+    gap: 14px 8px;
 }
 
 .ranked-section {
@@ -434,7 +441,7 @@ header .updated-time {
 .stock-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 8px;
+    gap: 14px 8px;
 }
 
 /* === Stock Card === */
@@ -446,6 +453,7 @@ header .updated-time {
     cursor: pointer;
     transition: all 0.15s ease;
     position: relative;
+    overflow: visible;
 }
 
 .stock-card:hover {
@@ -516,35 +524,76 @@ header .updated-time {
 /* === Watch Button === */
 .watch-btn {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    background: none;
-    border: none;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
     color: var(--border-strong);
-    padding: 2px;
-    line-height: 1;
-    transition: all 0.15s;
+    padding: 1px 8px;
+    line-height: 1.4;
     opacity: 0;
-    z-index: 1;
+    z-index: 2;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+    pointer-events: none;
 }
 
-.stock-card:hover .watch-btn,
+.stock-card:hover .watch-btn {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
 .watch-btn.active {
     opacity: 1;
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.3);
+    background: var(--bg-secondary);
+    pointer-events: auto;
 }
 
-.watch-btn.active {
-    color: #f59e0b;
+.stock-card:not(:hover) .watch-btn.active {
+    transform: translateX(-50%) translateY(0);
 }
 
 .watch-btn:hover {
-    transform: scale(1.3);
+    transform: translateX(-50%) scale(1.15);
 }
 
 .stock-card.watched {
     border-color: rgba(245, 158, 11, 0.3);
+}
+
+.card-fly-out {
+    animation: flyOut 0.3s ease forwards;
+}
+
+.card-fly-in {
+    animation: flyIn 0.3s ease;
+}
+
+@keyframes flyOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.9) translateY(-8px); }
+}
+
+@keyframes flyIn {
+    0% { opacity: 0; transform: scale(0.95) translateY(6px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.card-spotlight {
+    animation: spotlight 0.8s ease 0.3s;
+}
+
+@keyframes spotlight {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+    40% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.3); border-color: #f59e0b; }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
 }
 
 /* === Card Tags === */

@@ -26,6 +26,8 @@
         } catch { return []; }
     }
 
+    let pendingReorder = null;
+
     function toggleWatchlist(symbol) {
         const list = getWatchlist();
         const idx = list.indexOf(symbol);
@@ -35,7 +37,43 @@
             list.push(symbol);
         }
         localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
-        applyFilter();
+
+        // Update star UI in place
+        document.querySelectorAll(`.stock-card[data-symbol="${symbol}"]`).forEach((card) => {
+            const btn = card.querySelector(".watch-btn");
+            const watched = idx < 0;
+            card.classList.toggle("watched", watched);
+            if (btn) {
+                btn.classList.toggle("active", watched);
+                btn.textContent = watched ? "★" : "☆";
+                btn.title = watched ? "取消自选" : "加入自选";
+            }
+
+            // Schedule reorder on mouseleave
+            if (pendingReorder) {
+                card.removeEventListener("mouseleave", pendingReorder);
+            }
+            pendingReorder = function handler() {
+                card.removeEventListener("mouseleave", handler);
+                pendingReorder = null;
+                card.classList.add("card-fly-out");
+                card.addEventListener("animationend", () => {
+                    applyFilter();
+                    // Highlight the moved card at its new position
+                    const target = document.querySelector(`.stock-card[data-symbol="${symbol}"]`);
+                    if (target && watched) {
+                        target.classList.add("card-spotlight");
+                        target.addEventListener("animationend", () => target.classList.remove("card-spotlight"), { once: true });
+                    }
+                    // Animate all cards in
+                    document.querySelectorAll(".stock-card").forEach((c) => {
+                        c.classList.add("card-fly-in");
+                        c.addEventListener("animationend", () => c.classList.remove("card-fly-in"), { once: true });
+                    });
+                }, { once: true });
+            };
+            card.addEventListener("mouseleave", pendingReorder);
+        });
     }
 
     function isWatched(symbol) {
@@ -103,7 +141,7 @@
     function renderInfoBar() {
         // Market summary
         const summary = stockData.market_summary || "";
-        document.getElementById("infoSummary").innerHTML = `<span class="summary-label">综述</span><span>${summary}</span>`;
+        document.getElementById("infoSummary").innerHTML = `<span class="summary-label">综述</span><div class="summary-text">${summary}</div>`;
 
         // Scrolling news
         const news = stockData.news || [];

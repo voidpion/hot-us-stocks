@@ -25,7 +25,8 @@ def resolve_name(symbol: str) -> str:
     """Fetch real company name from Sina Finance API."""
     try:
         url = f"https://hq.sinajs.cn/list=gb_{symbol.lower()}"
-        r = requests.get(url, timeout=10, verify=False)
+        headers = {"Referer": "https://finance.sina.com.cn"}
+        r = requests.get(url, timeout=10, verify=False, headers=headers)
         if '=""' in r.text or len(r.text.strip()) <= 20:
             return ""
         match = re.search(r'"(.+)"', r.text)

@@ -34,7 +34,8 @@ def resolve_stock_name(symbol: str) -> str:
     """Fetch real company name from Sina Finance API."""
     try:
         url = f"https://hq.sinajs.cn/list=gb_{symbol.lower()}"
-        r = requests.get(url, timeout=10)
+        headers = {"Referer": "https://finance.sina.com.cn"}
+        r = requests.get(url, timeout=10, headers=headers)
         match = re.search(r'"(.+)"', r.text)
         if match:
             fields = match.group(1).split(",")
