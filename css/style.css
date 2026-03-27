@@ -1052,7 +1052,7 @@ header .updated-time {
 @media (max-width: 900px) {
     .two-col {
         flex-direction: column;
-        gap: 16px;
+        gap: 10px;
     }
 
     .two-col .col-us,
@@ -1063,21 +1063,54 @@ header .updated-time {
 }
 
 @media (max-width: 768px) {
+    .container {
+        padding: 0 12px;
+    }
+
+    main.container {
+        padding-top: 44px;
+        padding-bottom: 50px;
+    }
+
+    header {
+        padding: 6px 0;
+    }
+
+    header .container {
+        flex-direction: row;
+        gap: 8px;
+        align-items: baseline;
+    }
+
+    header h1 {
+        font-size: 16px;
+    }
+
+    header .subtitle {
+        font-size: 11px;
+    }
+
+    header .updated-time {
+        font-size: 10px;
+    }
+
     .filter-bar {
         flex-direction: column;
         align-items: flex-start;
-        gap: 8px;
-        padding: 8px 12px;
+        gap: 6px;
+        padding: 6px 10px;
     }
 
     .filter-btn,
     .sort-btn {
-        padding: 4px 10px;
+        padding: 3px 8px;
         font-size: 11px;
     }
 
     .stats-bar {
-        padding: 8px 12px;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 6px 10px;
         gap: 4px;
         font-size: 11px;
     }
@@ -1086,88 +1119,169 @@ header .updated-time {
         min-width: 60px;
     }
 
-    .stats-bar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     .sparkline-toggle {
         align-self: flex-end;
     }
 
+    .spark-btn {
+        font-size: 11px;
+    }
+
+    .color-mode-btn {
+        font-size: 11px;
+    }
+
     .info-bar {
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
+        height: auto;
+        max-height: 120px;
+        padding: 8px 10px;
     }
 
     .info-summary {
         border-right: none;
         border-bottom: 1px solid var(--border);
         padding-right: 0;
-        padding-bottom: 8px;
+        padding-bottom: 6px;
+        font-size: 11px;
+        max-height: 50px;
     }
 
-    .container {
-        padding: 0 16px;
+    .info-news {
+        max-height: 50px;
     }
 
-    header .container {
-        flex-direction: column;
+    .news-item {
+        font-size: 11px;
+    }
+
+    .tag-filter-bar {
         gap: 4px;
-        align-items: center;
     }
 
-    header .updated-time {
-        margin-left: 0;
+    .tag-chip {
+        font-size: 11px;
+        padding: 1px 7px;
     }
 
     .stock-grid {
-        grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         gap: 6px;
     }
 
     .stock-card {
-        padding: 10px 12px;
+        padding: 8px 10px;
+    }
+
+    .stock-card .symbol {
+        font-size: 12px;
+    }
+
+    .stock-card .name {
+        font-size: 10px;
     }
 
     .stock-card .price {
-        font-size: 13px;
+        font-size: 12px;
+    }
+
+    .stock-card .change {
+        font-size: 11px;
     }
 
     .sparkline-container {
-        height: 36px;
+        height: 32px;
     }
 
+    .card-tags .tag {
+        font-size: 8px;
+        padding: 0px 4px;
+    }
+
+    /* Chart section mobile */
     .chart-section {
-        padding: 16px;
+        padding: 8px 12px;
+    }
+
+    .chart-section.expanded {
+        padding: 10px 12px;
+    }
+
+    .chart-section.expanded .chart-container {
+        max-height: 200px;
     }
 
     .chart-container {
-        height: 300px;
+        height: 200px;
     }
 
     .chart-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
+        gap: 6px;
+        font-size: 13px;
+    }
+
+    .chart-stock-symbol {
+        font-size: 14px;
+    }
+
+    #chartStockName {
+        font-size: 13px;
+    }
+
+    .range-btn {
+        padding: 3px 8px;
+        font-size: 10px;
+    }
+
+    .idx-tag {
+        font-size: 11px;
+        padding: 2px 6px;
     }
 
     .chart-details-inline {
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 4px;
     }
 
     .detail-kv {
         display: none;
+    }
+
+    .chart-footer {
+        font-size: 9px;
+    }
+
+    .section-title {
+        font-size: 11px;
     }
 }
 
 @media (max-width: 480px) {
     .stock-grid {
         grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
+    }
+
+    .stock-card {
+        padding: 6px 8px;
     }
 
     .chart-container {
-        height: 250px;
+        height: 180px;
+    }
+
+    .chart-section.expanded .chart-container {
+        max-height: 180px;
+    }
+
+    header .subtitle {
+        display: none;
+    }
+
+    .filter-btn,
+    .sort-btn {
+        padding: 2px 6px;
+        font-size: 10px;
     }
 }
