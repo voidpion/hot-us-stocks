@@ -6,6 +6,7 @@ Uses akshare library which provides reliable access to US stock data.
 
 import json
 import os
+import re
 import ssl
 from datetime import datetime, timedelta
 
@@ -25,7 +26,15 @@ requests.Session.request = _patched_request
 
 import akshare as ak
 
-STOCKS = {
+# US Major Indices (ETF proxies)
+INDICES = {
+    "SPY": "S&P 500",
+    "DIA": "Dow Jones",
+    "QQQ": "Nasdaq 100",
+}
+
+US_STOCKS = {
+    # Magnificent 7
     "AAPL": "Apple",
     "MSFT": "Microsoft",
     "GOOGL": "Alphabet",
@@ -33,11 +42,42 @@ STOCKS = {
     "NVDA": "NVIDIA",
     "META": "Meta Platforms",
     "TSLA": "Tesla",
+    # Semiconductor
     "AMD": "AMD",
-    "NFLX": "Netflix",
     "AVGO": "Broadcom",
+    "INTC": "Intel",
+    "QCOM": "Qualcomm",
+    "MU": "Micron",
+    # Software & Cloud
     "CRM": "Salesforce",
-    "COST": "Costco",
+    "ORCL": "Oracle",
+    "ADBE": "Adobe",
+    "NOW": "ServiceNow",
+    # Internet & Media
+    "NFLX": "Netflix",
+    "UBER": "Uber",
+    "ABNB": "Airbnb",
+    "SNAP": "Snap",
+    # Fintech & Payments
+    "V": "Visa",
+    "PYPL": "PayPal",
+    "SQ": "Block",
+    "COIN": "Coinbase",
+}
+
+CN_STOCKS = {
+    "BABA": "阿里巴巴",
+    "PDD": "拼多多",
+    "JD": "京东",
+    "BIDU": "百度",
+    "NIO": "蔚来",
+    "XPEV": "小鹏汽车",
+    "LI": "理想汽车",
+    "TME": "腾讯音乐",
+    "BILI": "哔哩哔哩",
+    "IQ": "爱奇艺",
+    "ZH": "知乎",
+    "FUTU": "富途控股",
 }
 
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
@@ -51,11 +91,18 @@ def fetch_stock_data(symbol: str, name: str) -> dict | None:
         end_date = datetime.now().strftime("%Y%m%d")
         start_date = (datetime.now() - timedelta(days=400)).strftime("%Y%m%d")
 
-        df = ak.stock_us_daily(symbol=symbol, adjust="qfq")
+        try:
+            df = ak.stock_us_daily(symbol=symbol, adjust="qfq")
+        except Exception:
+            # Fallback: fetch without adjustment if qfq fails
+            df = ak.stock_us_daily(symbol=symbol, adjust="")
 
         if df is None or df.empty:
             print(f"  Warning: No data for {symbol}")
             return None
+
+        # Make a writable copy to avoid read-only array issues
+        df = df.copy()
 
         # akshare returns columns: date, open, high, low, close, volume
         # Filter to last ~365 days
@@ -86,6 +133,9 @@ def fetch_stock_data(symbol: str, name: str) -> dict | None:
         change = round(latest["close"] - prev["close"], 2)
         change_percent = round((change / prev["close"]) * 100, 2) if prev["close"] != 0 else 0
 
+        # Fetch intraday data
+        intraday = fetch_intraday(symbol)
+
         return {
             "symbol": symbol,
             "name": name,
@@ -101,30 +151,77 @@ def fetch_stock_data(symbol: str, name: str) -> dict | None:
                 "prev_close": prev["close"],
             },
             "history": history,
+            "intraday": intraday,
         }
     except Exception as e:
         print(f"  Error fetching {symbol}: {e}")
         return None
 
 
-def main():
-    print("Fetching US stock data via akshare...")
-    all_stocks = []
+def fetch_intraday(symbol: str) -> list[dict]:
+    """Fetch 5-min intraday data for last trading day from Sina Finance."""
+    try:
+        url = (
+            f"https://stock.finance.sina.com.cn/usstock/api/jsonp_v2.php/"
+            f"var/US_MinKService.getMinK?symbol={symbol.lower()}&type=5"
+        )
+        r = requests.get(url, timeout=15)
+        match = re.search(r"var\((.*)\)", r.text, re.DOTALL)
+        if not match:
+            return []
+        data = json.loads(match.group(1))
+        if not data:
+            return []
 
-    for symbol, name in STOCKS.items():
+        # Find the last complete trading day (the one before today if market is open)
+        # Group by date
+        dates = sorted(set(d["d"].split(" ")[0] for d in data))
+        # Use the second-to-last date if there's more than one, to get a full day
+        # If today has data, use the previous full day; otherwise use the last date
+        if len(dates) >= 2:
+            target_date = dates[-2] if len([d for d in data if d["d"].startswith(dates[-1])]) < 60 else dates[-1]
+        else:
+            target_date = dates[-1]
+
+        day_data = [d for d in data if d["d"].startswith(target_date)]
+        return [{
+            "time": d["d"].split(" ")[1][:5],  # "09:35"
+            "close": round(float(d["c"]), 2),
+            "volume": int(d["v"]),
+        } for d in day_data]
+    except Exception as e:
+        print(f"    Intraday error for {symbol}: {e}")
+        return []
+
+
+def fetch_group(stock_dict: dict, label: str) -> list[dict]:
+    """Fetch data for a group of stocks."""
+    print(f"\nFetching {label}...")
+    results = []
+    for symbol, name in stock_dict.items():
         print(f"  Fetching {symbol} ({name})...")
         data = fetch_stock_data(symbol, name)
         if data:
-            all_stocks.append(data)
+            results.append(data)
+    return results
 
-    if not all_stocks:
+
+def main():
+    indices = fetch_group(INDICES, "US Indices")
+    us_stocks = fetch_group(US_STOCKS, "US Stocks")
+    cn_stocks = fetch_group(CN_STOCKS, "Chinese ADRs")
+
+    if not us_stocks and not cn_stocks:
         print("Error: No stock data was fetched!")
         return
 
+    all_stocks = indices + us_stocks + cn_stocks
     result = {
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "market_date": all_stocks[0]["yesterday"]["date"] if all_stocks else "",
-        "stocks": all_stocks,
+        "indices": indices,
+        "us_stocks": us_stocks,
+        "cn_stocks": cn_stocks,
     }
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -133,7 +230,7 @@ def main():
         json.dump(result, f, ensure_ascii=False, indent=2)
 
     print(f"\nDone! Data saved to {output_path}")
-    print(f"  Stocks fetched: {len(all_stocks)}")
+    print(f"  Indices: {len(indices)}, US stocks: {len(us_stocks)}, Chinese ADRs: {len(cn_stocks)}")
     print(f"  Market date: {result['market_date']}")
 
 
