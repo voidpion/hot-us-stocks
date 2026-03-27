@@ -71,7 +71,7 @@
             return;
         }
         grid.innerHTML = stocks.map((stock) => buildCardHTML(stock)).join("");
-        renderSparklines(stocks);
+        renderSparklines(stocks, grid);
     }
 
     function getTrendTags(stock) {
@@ -231,9 +231,10 @@
         }
     }
 
-    function renderSparklines(stocks) {
+    function renderSparklines(stocks, container) {
+        const root = container || document;
         stocks.forEach((stock) => {
-            const canvas = document.querySelector(`.sparkline[data-symbol="${stock.symbol}"]`);
+            const canvas = root.querySelector(`.sparkline[data-symbol="${stock.symbol}"]`);
             if (!canvas) return;
 
             const { labels, prices } = getSparklineData(stock);
@@ -773,7 +774,7 @@
         grid.innerHTML = stocks.length
             ? stocks.map((stock) => buildCardHTML(stock)).join("")
             : '<div class="error-message">暂无符合条件的股票</div>';
-        if (stocks.length) renderSparklines(stocks);
+        if (stocks.length) renderSparklines(stocks, grid);
     }
 
     // === Utils ===
