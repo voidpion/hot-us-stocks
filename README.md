@@ -41,10 +41,12 @@ python -m http.server 8888
 股票列表维护在 [`config/stocks.yaml`](config/stocks.yaml)，通过 PR 添加新股票：
 
 1. Fork 本仓库
-2. 编辑 `config/stocks.yaml`，在对应分类下添加一行：
+2. 编辑 `config/stocks.yaml`，在对应分类下添加股票代码：
    ```yaml
    us_stocks:
-     PLTR: "Palantir"    # 新增
+     - PLTR          # 只需代码，名称自动获取
+   cn_stocks:
+     - TAL: 好未来    # 中概股可指定中文名
    ```
 3. 提交 PR — CI 会自动校验股票代码是否有效（绿色 ✅ 才可合并）
 4. 审核通过后 merge，下次构建自动生效

@@ -491,6 +491,40 @@ header .updated-time {
     background: var(--red-bg);
 }
 
+/* === Watch Button === */
+.watch-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--border-strong);
+    padding: 2px;
+    line-height: 1;
+    transition: all 0.15s;
+    opacity: 0;
+    z-index: 1;
+}
+
+.stock-card:hover .watch-btn,
+.watch-btn.active {
+    opacity: 1;
+}
+
+.watch-btn.active {
+    color: #f59e0b;
+}
+
+.watch-btn:hover {
+    transform: scale(1.3);
+}
+
+.stock-card.watched {
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
 /* === Card Tags === */
 .card-tags {
     display: flex;

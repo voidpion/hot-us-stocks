@@ -15,11 +15,37 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 CONFIG_PATH = "config/stocks.yaml"
 
 
+def parse_group(items: list) -> dict:
+    """Parse a mixed list into {symbol: name_or_None}."""
+    result = {}
+    if not isinstance(items, list):
+        return result
+    for item in items:
+        if isinstance(item, str):
+            result[item] = None
+        elif isinstance(item, dict):
+            for symbol, name in item.items():
+                result[str(symbol)] = str(name)
+    return result
+
+
+def get_all_symbols(config: dict) -> dict:
+    """Extract all symbols from config, keyed by symbol -> (group, name_or_None)."""
+    all_symbols = {}
+    for group in ["indices", "us_stocks", "cn_stocks"]:
+        items = config.get(group, [])
+        if not isinstance(items, list):
+            print(f"FAIL: '{group}' should be a list")
+            sys.exit(1)
+        for symbol, name in parse_group(items).items():
+            all_symbols[symbol] = (group, name)
+    return all_symbols
+
+
 def check_diff():
     """Ensure PR only adds new symbols — no modifications or deletions allowed."""
     import subprocess
 
-    # Get the base branch config (main)
     try:
         base_yaml = subprocess.run(
             ["git", "show", "origin/main:config/stocks.yaml"],
@@ -27,28 +53,20 @@ def check_diff():
         ).stdout
         base_config = yaml.safe_load(base_yaml) or {}
     except subprocess.CalledProcessError:
-        # First time adding the file, no base to compare
         return []
 
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         pr_config = yaml.safe_load(f) or {}
 
+    base_symbols = get_all_symbols(base_config)
+    pr_symbols = get_all_symbols(pr_config)
+
     errors = []
-    for group in ["indices", "us_stocks", "cn_stocks"]:
-        base_stocks = base_config.get(group, {}) or {}
-        pr_stocks = pr_config.get(group, {}) or {}
-
-        # Check for deleted symbols
-        for symbol in base_stocks:
-            if symbol not in pr_stocks:
-                errors.append(f"不允许删除: {symbol} ({base_stocks[symbol]}) from {group}")
-
-        # Check for modified names
-        for symbol in base_stocks:
-            if symbol in pr_stocks and pr_stocks[symbol] != base_stocks[symbol]:
-                errors.append(
-                    f"不允许修改: {symbol} \"{base_stocks[symbol]}\" -> \"{pr_stocks[symbol]}\" in {group}"
-                )
+    for symbol, (group, name) in base_symbols.items():
+        if symbol not in pr_symbols:
+            errors.append(f"不允许删除: {symbol} from {group}")
+        elif name is not None and pr_symbols[symbol][1] != name:
+            errors.append(f"不允许修改: {symbol} \"{name}\" -> \"{pr_symbols[symbol][1]}\" in {group}")
 
     return errors
 
@@ -60,8 +78,6 @@ def check_symbol(symbol: str) -> tuple[bool, str]:
         r = requests.get(url, timeout=10, verify=False)
         if '=""' in r.text or len(r.text.strip()) <= 20:
             return False, ""
-        # Sina format: var hq_str_gb_aapl="Apple Inc,..."
-        # The first field after the opening quote is the company name
         match = re.search(r'"(.+)"', r.text)
         if match:
             fields = match.group(1).split(",")
@@ -76,14 +92,7 @@ def main():
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    all_symbols = {}
-    for group in ["indices", "us_stocks", "cn_stocks"]:
-        stocks = config.get(group, {})
-        if not isinstance(stocks, dict):
-            print(f"FAIL: '{group}' should be a mapping of SYMBOL: Name")
-            sys.exit(1)
-        for symbol, name in stocks.items():
-            all_symbols[symbol] = (group, name)
+    all_symbols = get_all_symbols(config)
 
     # Check for unauthorized modifications/deletions
     diff_errors = check_diff()
@@ -97,24 +106,16 @@ def main():
     print(f"Validating {len(all_symbols)} symbols...\n")
 
     errors = []
-    warnings = []
     for symbol, (group, name) in all_symbols.items():
         valid, real_name = check_symbol(symbol)
         if not valid:
-            print(f"  [FAIL] {symbol} ({name}) in {group} — symbol not found")
-            errors.append(f"{symbol} ({name})")
-        elif real_name and name.lower() not in real_name.lower() and real_name.lower() not in name.lower():
-            print(f"  [WARN] {symbol}: config name \"{name}\" vs actual \"{real_name}\"")
-            warnings.append(f"{symbol}: \"{name}\" -> \"{real_name}\"")
+            print(f"  [FAIL] {symbol} in {group} — symbol not found")
+            errors.append(symbol)
         else:
-            print(f"  [ OK ] {symbol} ({name})")
+            display = name or real_name or symbol
+            print(f"  [ OK ] {symbol} ({display})")
 
     print()
-    if warnings:
-        print(f"WARNING: {len(warnings)} name mismatch(es):")
-        for w in warnings:
-            print(f"  {w}")
-        print()
     if errors:
         print(f"FAILED: {len(errors)} invalid symbol(s): {', '.join(errors)}")
         print("Please check that these are valid US-listed stock symbols.")

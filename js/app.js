@@ -17,6 +17,48 @@
     let activeSort = null;
     let sparklineMode = "intraday"; // "intraday" | "daily" | "monthly"
 
+    // === Watchlist (localStorage) ===
+    const WATCHLIST_KEY = "hot-us-stocks-watchlist";
+
+    function getWatchlist() {
+        try {
+            return JSON.parse(localStorage.getItem(WATCHLIST_KEY)) || [];
+        } catch { return []; }
+    }
+
+    function toggleWatchlist(symbol) {
+        const list = getWatchlist();
+        const idx = list.indexOf(symbol);
+        if (idx >= 0) {
+            list.splice(idx, 1);
+        } else {
+            list.push(symbol);
+        }
+        localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
+        applyFilter();
+    }
+
+    function isWatched(symbol) {
+        return getWatchlist().includes(symbol);
+    }
+
+    function sortWithWatchlistFirst(stocks) {
+        const watchlist = getWatchlist();
+        if (!watchlist.length) return stocks;
+        const watched = [];
+        const rest = [];
+        for (const s of stocks) {
+            if (watchlist.includes(s.symbol)) {
+                watched.push(s);
+            } else {
+                rest.push(s);
+            }
+        }
+        return [...watched, ...rest];
+    }
+
+    window.__toggleWatch = toggleWatchlist;
+
     const CATEGORIES = {
         mag7: ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"],
         semi: ["AMD", "AVGO", "INTC", "QCOM", "MU"],
@@ -89,6 +131,7 @@
             grid.innerHTML = '<div class="error-message">暂无数据</div>';
             return;
         }
+        stocks = sortWithWatchlistFirst(stocks);
         grid.innerHTML = stocks.map((stock) => buildCardHTML(stock)).join("");
         renderSparklines(stocks, grid);
     }
@@ -193,8 +236,11 @@
             ? `<div class="card-tags">${tags.map((t) => `<span class="tag tag-${t.type}">${t.text}</span>`).join("")}</div>`
             : "";
 
+        const watched = isWatched(stock.symbol);
+
         return `
-            <div class="stock-card" data-symbol="${stock.symbol}" onclick="window.__selectStock('${stock.symbol}')">
+            <div class="stock-card ${watched ? "watched" : ""}" data-symbol="${stock.symbol}" onclick="window.__selectStock('${stock.symbol}')">
+                <button class="watch-btn ${watched ? "active" : ""}" onclick="event.stopPropagation(); window.__toggleWatch('${stock.symbol}')" title="${watched ? "取消自选" : "加入自选"}">${watched ? "★" : "☆"}</button>
                 <div class="card-top">
                     <div>
                         <div class="symbol">${stock.symbol}</div>
@@ -794,7 +840,12 @@
         const twoCol = document.getElementById("twoColSection");
         const rankedEl = document.getElementById("rankedSection");
 
-        if (activeCategory === "all" && !activeSort) {
+        if (activeCategory === "watchlist" && !activeSort) {
+            // Watchlist: single grid view
+            twoCol.style.display = "none";
+            rankedEl.style.display = "block";
+            renderRankedView();
+        } else if (activeCategory === "all" && !activeSort) {
             // Default two-column view
             twoCol.style.display = "";
             rankedEl.style.display = "none";
@@ -812,7 +863,12 @@
 
     function getFilteredStocks() {
         let stocks;
-        if (activeCategory === "all") {
+        if (activeCategory === "watchlist") {
+            const watchlist = getWatchlist();
+            stocks = [...(stockData.us_stocks || []), ...(stockData.cn_stocks || [])].filter(
+                (s) => watchlist.includes(s.symbol)
+            );
+        } else if (activeCategory === "all") {
             stocks = [...(stockData.us_stocks || []), ...(stockData.cn_stocks || [])];
         } else if (activeCategory === "cn") {
             stocks = [...(stockData.cn_stocks || [])];
@@ -881,7 +937,7 @@
         let stocks = getFilteredStocks();
 
         const sortLabels = { top: "涨幅榜", bottom: "跌幅榜", up: "上涨", down: "下跌" };
-        const catLabels = { mag7: "七巨头", semi: "半导体", software: "软件云", internet: "互联网", fintech: "金融科技", cn: "中概股", all: "全部" };
+        const catLabels = { watchlist: "自选", mag7: "七巨头", semi: "半导体", software: "软件云", internet: "互联网", fintech: "金融科技", cn: "中概股", all: "全部" };
 
         if (activeSort === "top") {
             stocks.sort((a, b) => b.yesterday.change_percent - a.yesterday.change_percent);
@@ -893,6 +949,8 @@
         } else if (activeSort === "down") {
             stocks = stocks.filter((s) => s.yesterday.change < 0);
             stocks.sort((a, b) => a.yesterday.change_percent - b.yesterday.change_percent);
+        } else {
+            stocks = sortWithWatchlistFirst(stocks);
         }
 
         const title = activeSort

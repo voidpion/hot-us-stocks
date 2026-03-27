@@ -14,11 +14,11 @@ body:
   - type: input
     id: name
     attributes:
-      label: 股票名称
-      description: 公司名称
+      label: 股票名称（可选）
+      description: 公司名称，不填会自动获取。中概股建议填中文名。
       placeholder: Palantir
     validations:
-      required: true
+      required: false
   - type: dropdown
     id: category
     attributes:

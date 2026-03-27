@@ -30,10 +30,52 @@ import akshare as ak
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "stocks.yaml")
 
 
-def load_stock_config() -> dict:
+def resolve_stock_name(symbol: str) -> str:
+    """Fetch real company name from Sina Finance API."""
+    try:
+        url = f"https://hq.sinajs.cn/list=gb_{symbol.lower()}"
+        r = requests.get(url, timeout=10)
+        match = re.search(r'"(.+)"', r.text)
+        if match:
+            fields = match.group(1).split(",")
+            return fields[0].strip() if fields else symbol
+    except Exception:
+        pass
+    return symbol
+
+
+def parse_stock_list(items: list) -> dict:
+    """Parse a mixed list of strings and dicts into {symbol: name}.
+
+    Supports:
+      - "AAPL"           -> auto-fetch name
+      - BABA: 阿里巴巴   -> use provided name
+    """
+    result = {}
+    for item in items:
+        if isinstance(item, str):
+            result[item] = None  # name to be resolved
+        elif isinstance(item, dict):
+            for symbol, name in item.items():
+                result[str(symbol)] = str(name)
+    # Resolve missing names
+    for symbol in result:
+        if result[symbol] is None:
+            result[symbol] = resolve_stock_name(symbol)
+            print(f"    Resolved {symbol} -> {result[symbol]}")
+    return result
+
+
+def load_stock_config() -> tuple[dict, dict, dict]:
     """Load stock lists from config/stocks.yaml."""
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+
+    print("Resolving stock names...")
+    indices = parse_stock_list(config.get("indices", []))
+    us_stocks = parse_stock_list(config.get("us_stocks", []))
+    cn_stocks = parse_stock_list(config.get("cn_stocks", []))
+    return indices, us_stocks, cn_stocks
 
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 
@@ -318,10 +360,7 @@ def fetch_news() -> list[dict]:
 
 
 def main():
-    config = load_stock_config()
-    INDICES = config.get("indices", {})
-    US_STOCKS = config.get("us_stocks", {})
-    CN_STOCKS = config.get("cn_stocks", {})
+    INDICES, US_STOCKS, CN_STOCKS = load_stock_config()
 
     indices = fetch_group(INDICES, "US Indices")
     us_stocks = fetch_group(US_STOCKS, "US Stocks")
