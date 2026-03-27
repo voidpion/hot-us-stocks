@@ -1,9 +1,9 @@
 name: Fetch Data & Deploy to GitHub Pages
 
 on:
-  # Daily at UTC 0:00 (Beijing 8:00), Tue-Sat to cover Mon-Fri US trading days
+  # Daily at UTC 0:30 (Beijing 8:30), Tue-Sat to cover Mon-Fri US trading days
   schedule:
-    - cron: "0 0 * * 2-6"
+    - cron: "30 0 * * 2-6"
   # Also deploy on push to main
   push:
     branches: [main]
@@ -39,6 +39,8 @@ jobs:
 
       - name: Fetch stock data
         run: python scripts/fetch_data.py
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 
       - name: Prepare site
         run: |

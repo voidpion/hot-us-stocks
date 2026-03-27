@@ -206,6 +206,162 @@ def fetch_group(stock_dict: dict, label: str) -> list[dict]:
     return results
 
 
+SECTOR_MAP = {
+    "七巨头": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"],
+    "半导体": ["AMD", "AVGO", "INTC", "QCOM", "MU"],
+    "软件云": ["CRM", "ORCL", "ADBE", "NOW"],
+    "互联网": ["NFLX", "UBER", "ABNB", "SNAP"],
+    "金融科技": ["V", "PYPL", "SQ", "COIN"],
+}
+
+
+def generate_market_summary(indices: list, us_stocks: list, cn_stocks: list) -> str:
+    """Generate a template-based market summary from the data."""
+    all_stocks = us_stocks + cn_stocks
+    if not all_stocks:
+        return "暂无市场数据。"
+
+    # Index performance
+    idx_parts = []
+    for idx in indices:
+        d = idx["yesterday"]
+        sign = "+" if d["change_percent"] >= 0 else ""
+        idx_parts.append(f"{idx['name']}{sign}{d['change_percent']:.2f}%")
+
+    # Up/down stats
+    up = [s for s in all_stocks if s["yesterday"]["change"] > 0]
+    down = [s for s in all_stocks if s["yesterday"]["change"] < 0]
+    total = len(all_stocks)
+
+    # Weighted sentiment: consider magnitude, not just count
+    avg_change = sum(s["yesterday"]["change_percent"] for s in all_stocks) / total
+    big_drops = [s for s in all_stocks if s["yesterday"]["change_percent"] <= -3]
+    big_gains = [s for s in all_stocks if s["yesterday"]["change_percent"] >= 3]
+
+    if avg_change >= 1.5:
+        mood = "市场大幅上涨，做多情绪强烈"
+    elif avg_change >= 0.5:
+        mood = "市场整体偏强"
+    elif avg_change > -0.5:
+        if big_drops and big_gains:
+            mood = "市场分化明显，个股涨跌剧烈"
+        elif big_drops:
+            mood = "市场涨跌互现，但部分个股跌幅较深"
+        else:
+            mood = "市场整体表现平稳"
+    elif avg_change > -1.5:
+        mood = "市场整体偏弱"
+    else:
+        mood = "市场大幅下挫，避险情绪浓厚"
+
+    # Sector highlights: find sectors with notable average moves
+    sector_notes = []
+    all_stock_map = {s["symbol"]: s for s in us_stocks}
+    for sector_name, symbols in SECTOR_MAP.items():
+        sector_stocks = [all_stock_map[sym] for sym in symbols if sym in all_stock_map]
+        if not sector_stocks:
+            continue
+        sector_avg = sum(s["yesterday"]["change_percent"] for s in sector_stocks) / len(sector_stocks)
+        if sector_avg <= -2:
+            sector_notes.append(f"{sector_name}板块整体走弱(均跌{abs(sector_avg):.1f}%)")
+        elif sector_avg >= 2:
+            sector_notes.append(f"{sector_name}板块表现强劲(均涨{sector_avg:.1f}%)")
+
+    # CN stocks
+    if cn_stocks:
+        cn_avg = sum(s["yesterday"]["change_percent"] for s in cn_stocks) / len(cn_stocks)
+        if cn_avg <= -2:
+            sector_notes.append(f"中概股集体承压(均跌{abs(cn_avg):.1f}%)")
+        elif cn_avg >= 2:
+            sector_notes.append(f"中概股集体走强(均涨{cn_avg:.1f}%)")
+
+    # Top gainers and losers
+    sorted_stocks = sorted(all_stocks, key=lambda s: s["yesterday"]["change_percent"], reverse=True)
+    best = sorted_stocks[0]
+    worst = sorted_stocks[-1]
+    best_sign = "+" if best["yesterday"]["change_percent"] >= 0 else ""
+    worst_sign = "+" if worst["yesterday"]["change_percent"] >= 0 else ""
+
+    parts = [
+        f"美股三大指数：{', '.join(idx_parts)}。",
+        f"{mood}，上涨{len(up)}只、下跌{len(down)}只（共{total}只）。",
+    ]
+    if sector_notes:
+        parts.append("；".join(sector_notes) + "。")
+    parts.append(
+        f"领涨：{best['name']}({best['symbol']}){best_sign}{best['yesterday']['change_percent']:.2f}%，"
+        f"领跌：{worst['name']}({worst['symbol']}){worst_sign}{worst['yesterday']['change_percent']:.2f}%。"
+    )
+    return "".join(parts)
+
+
+def generate_ai_summary(template_summary: str, indices: list, us_stocks: list, cn_stocks: list) -> str | None:
+    """Try to generate an AI-powered market summary using DeepSeek or OpenAI."""
+    api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return None
+
+    base_url = "https://api.deepseek.com" if os.environ.get("DEEPSEEK_API_KEY") else "https://api.openai.com"
+    model = "deepseek-chat" if os.environ.get("DEEPSEEK_API_KEY") else "gpt-4o-mini"
+
+    # Build concise data for the prompt
+    idx_info = ", ".join(
+        f"{i['name']} {'+' if i['yesterday']['change_percent'] >= 0 else ''}{i['yesterday']['change_percent']:.2f}%"
+        for i in indices
+    )
+    top5 = sorted(us_stocks + cn_stocks, key=lambda s: s["yesterday"]["change_percent"], reverse=True)[:5]
+    bottom5 = sorted(us_stocks + cn_stocks, key=lambda s: s["yesterday"]["change_percent"])[:5]
+    top_info = ", ".join(f"{s['symbol']}{'+' if s['yesterday']['change_percent'] >= 0 else ''}{s['yesterday']['change_percent']:.2f}%" for s in top5)
+    bot_info = ", ".join(f"{s['symbol']}{'+' if s['yesterday']['change_percent'] >= 0 else ''}{s['yesterday']['change_percent']:.2f}%" for s in bottom5)
+
+    prompt = (
+        f"你是美股市场分析师，请用中文写一段简短的昨日美股市场综述（80-120字），风格专业简洁。\n"
+        f"三大指数：{idx_info}\n"
+        f"涨幅前5：{top_info}\n"
+        f"跌幅前5：{bot_info}\n"
+        f"请直接输出综述文字，不要加标题或标点以外的格式。"
+    )
+
+    try:
+        resp = requests.post(
+            f"{base_url}/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 300},
+            timeout=30,
+        )
+        if resp.ok:
+            text = resp.json()["choices"][0]["message"]["content"].strip()
+            print(f"  AI summary generated ({len(text)} chars)")
+            return text
+    except Exception as e:
+        print(f"  AI summary failed: {e}")
+    return None
+
+
+def fetch_news() -> list[dict]:
+    """Fetch latest US stock news from Sina Finance."""
+    try:
+        url = "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2514&num=30&page=1"
+        r = requests.get(url, timeout=15)
+        data = r.json()
+        items = data.get("result", {}).get("data", [])
+        news = []
+        for item in items[:20]:
+            title = item.get("title", "").strip()
+            # Clean HTML tags
+            title = re.sub(r"<[^>]+>", "", title)
+            if not title:
+                continue
+            ts = int(item.get("ctime", 0))
+            time_str = datetime.fromtimestamp(ts).strftime("%H:%M") if ts else ""
+            news.append({"title": title, "time": time_str})
+        print(f"  Fetched {len(news)} news items")
+        return news
+    except Exception as e:
+        print(f"  News fetch error: {e}")
+        return []
+
+
 def main():
     indices = fetch_group(INDICES, "US Indices")
     us_stocks = fetch_group(US_STOCKS, "US Stocks")
@@ -215,10 +371,22 @@ def main():
         print("Error: No stock data was fetched!")
         return
 
+    # Generate market summary
+    print("\nGenerating market summary...")
+    template_summary = generate_market_summary(indices, us_stocks, cn_stocks)
+    ai_summary = generate_ai_summary(template_summary, indices, us_stocks, cn_stocks)
+    summary = ai_summary or template_summary
+
+    # Fetch news
+    print("Fetching news...")
+    news = fetch_news()
+
     all_stocks = indices + us_stocks + cn_stocks
     result = {
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "market_date": all_stocks[0]["yesterday"]["date"] if all_stocks else "",
+        "market_summary": summary,
+        "news": news,
         "indices": indices,
         "us_stocks": us_stocks,
         "cn_stocks": cn_stocks,

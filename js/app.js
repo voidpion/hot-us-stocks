@@ -50,11 +50,30 @@
 
     function render() {
         renderHeader();
+        renderInfoBar();
         renderStockGrid("usStockGrid", stockData.us_stocks || []);
         renderStockGrid("cnStockGrid", stockData.cn_stocks || []);
         renderStatsBar();
         // Default: show indices overview
         showIndicesChart();
+    }
+
+    function renderInfoBar() {
+        // Market summary
+        const summary = stockData.market_summary || "";
+        document.getElementById("infoSummary").textContent = summary;
+
+        // Scrolling news
+        const news = stockData.news || [];
+        if (!news.length) {
+            document.getElementById("infoBar").style.display = "none";
+            return;
+        }
+        // Duplicate items for seamless infinite scroll
+        const items = news.map((n) =>
+            `<span class="news-item"><span class="news-time">${n.time}</span>${n.title}</span>`
+        ).join("");
+        document.getElementById("newsScroll").innerHTML = items + items;
     }
 
     function renderHeader() {
