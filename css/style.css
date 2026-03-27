@@ -1141,48 +1141,9 @@ header .updated-time {
         flex-shrink: 0;
     }
 
-    /* --- Stats bar: collapsed by default --- */
+    /* --- Stats bar: hidden on mobile --- */
     .stats-bar {
-        padding: 0;
-        border: none;
-        background: none;
-        margin-top: 6px;
-    }
-
-    .stats-bar .stats-content {
-        max-height: 0;
-        overflow: hidden;
-        opacity: 0;
-        transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
-        padding: 0 10px;
-    }
-
-    .stats-bar.mobile-expanded .stats-content {
-        max-height: 200px;
-        opacity: 1;
-        padding: 8px 10px;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        font-size: 12px;
-    }
-
-    .stats-bar .sparkline-toggle {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .stats-mobile-toggle {
-        display: inline-flex;
-    }
-
-    .spark-btn {
-        font-size: 12px;
-    }
-
-    .color-mode-btn {
-        font-size: 12px;
+        display: none !important;
     }
 
     /* --- Info bar: hidden on mobile --- */
@@ -1203,7 +1164,7 @@ header .updated-time {
 
     /* --- Stock cards --- */
     .stock-grid {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        grid-template-columns: 1fr;
         gap: 6px;
     }
 
@@ -1286,11 +1247,6 @@ header .updated-time {
 @media (max-width: 480px) {
     header .subtitle {
         display: none;
-    }
-
-    .stock-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 4px;
     }
 
     .chart-container {
