@@ -497,19 +497,141 @@
         return history.filter((d) => new Date(d.date) >= cutoff);
     }
 
+    // === Candlestick Plugin ===
+
+    const candlestickWicks = {
+        id: "candlestickWicks",
+        afterDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !chart._ohlcData) return;
+            const ctx = chart.ctx;
+            const data = chart._ohlcData;
+            meta.data.forEach((bar, i) => {
+                const d = data[i];
+                if (!d) return;
+                const x = bar.x;
+                const yHigh = chart.scales.y.getPixelForValue(d.high);
+                const yLow = chart.scales.y.getPixelForValue(d.low);
+                ctx.save();
+                ctx.beginPath();
+                ctx.strokeStyle = d.close >= d.open ? "#059669" : "#dc2626";
+                ctx.lineWidth = 1;
+                ctx.moveTo(x, yHigh);
+                ctx.lineTo(x, yLow);
+                ctx.stroke();
+                ctx.restore();
+            });
+        },
+    };
+
+    function drawCandlestickChart(data) {
+        const labels = data.map((d) => d.date);
+        const bodies = data.map((d) => [Math.min(d.open, d.close), Math.max(d.open, d.close)]);
+        const bgColors = data.map((d) => d.close >= d.open ? "#059669" : "#dc2626");
+
+        const allHighs = data.map((d) => d.high);
+        const allLows = data.map((d) => d.low);
+        const maxPrice = Math.max(...allHighs);
+        const minPrice = Math.min(...allLows);
+        const padding = (maxPrice - minPrice) * 0.08 || 1;
+        const yMin = minPrice - padding;
+        const yMax = maxPrice + padding;
+
+        const ctx = document.getElementById("stockChart").getContext("2d");
+        if (chart) chart.destroy();
+
+        chart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{
+                    data: bodies,
+                    backgroundColor: bgColors,
+                    borderColor: bgColors,
+                    borderWidth: 1,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.9,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { intersect: false, mode: "index" },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "#ffffff",
+                        titleColor: "#111827",
+                        bodyColor: "#111827",
+                        borderColor: "#e2e5ea",
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false,
+                        callbacks: {
+                            title: (items) => {
+                                const parts = items[0].label.split("-");
+                                return `${parts[0]}-${parts[1]}-${parts[2]}`;
+                            },
+                            label: (item) => {
+                                const d = data[item.dataIndex];
+                                const sign = d.close >= d.open ? "+" : "";
+                                const chg = ((d.close - d.open) / d.open * 100).toFixed(2);
+                                return [
+                                    `开: $${d.open.toFixed(2)}`,
+                                    `高: $${d.high.toFixed(2)}`,
+                                    `低: $${d.low.toFixed(2)}`,
+                                    `收: $${d.close.toFixed(2)}`,
+                                    `幅: ${sign}${chg}%`,
+                                ];
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { color: "rgba(0,0,0,0.04)", drawBorder: false },
+                        ticks: {
+                            color: "#9ca3af",
+                            maxTicksLimit: 8,
+                            maxRotation: 0,
+                            callback: function (val) {
+                                const lbl = this.getLabelForValue(val);
+                                const parts = lbl.split("-");
+                                return `${parts[1]}/${parts[2]}`;
+                            },
+                        },
+                    },
+                    y: {
+                        min: yMin,
+                        max: yMax,
+                        grid: { color: "rgba(0,0,0,0.04)", drawBorder: false },
+                        ticks: {
+                            color: "#9ca3af",
+                            callback: (val) => `$${val.toFixed(val >= 100 ? 0 : 2)}`,
+                        },
+                        position: "right",
+                    },
+                },
+            },
+            plugins: [candlestickWicks],
+        });
+        chart._ohlcData = data;
+    }
+
     function updateSingleChart() {
         const isIntraday = selectedRange === "1D";
-        let labels, prices;
 
-        if (isIntraday) {
-            const intraday = selectedStock.intraday || [];
-            labels = intraday.map((d) => d.time);
-            prices = intraday.map((d) => d.close);
-        } else {
+        if (!isIntraday) {
             const filtered = getFilteredHistory(selectedRange);
-            labels = filtered.map((d) => d.date);
-            prices = filtered.map((d) => d.close);
+            if (filtered.length) {
+                drawCandlestickChart(filtered);
+                return;
+            }
         }
+
+        const intraday = selectedStock.intraday || [];
+        const labels = intraday.map((d) => d.time);
+        const prices = intraday.map((d) => d.close);
 
         const isUp = prices.length >= 2 && prices[prices.length - 1] >= prices[0];
         const lineColor = isUp ? "#059669" : "#dc2626";
@@ -532,7 +654,7 @@
                     pointHoverRadius: 5,
                     pointHoverBackgroundColor: lineColor,
                     fill: true,
-                    tension: isIntraday ? 0.3 : 0.1,
+                    tension: 0.3,
                 }],
             },
             options: {
@@ -560,21 +682,15 @@
                         grid: { color: "rgba(0,0,0,0.04)", drawBorder: false },
                         ticks: {
                             color: "#9ca3af",
-                            maxTicksLimit: isIntraday ? 12 : 8,
+                            maxTicksLimit: 12,
                             maxRotation: 0,
-                            callback: function (val) {
-                                const lbl = this.getLabelForValue(val);
-                                if (isIntraday) return lbl;
-                                const parts = lbl.split("-");
-                                return `${parts[1]}/${parts[2]}`;
-                            },
                         },
                     },
                     y: {
                         grid: { color: "rgba(0,0,0,0.04)", drawBorder: false },
                         ticks: {
                             color: "#9ca3af",
-                            callback: (val) => `$${val.toFixed(isIntraday ? 2 : 0)}`,
+                            callback: (val) => `$${val.toFixed(2)}`,
                         },
                         position: "right",
                     },
