@@ -610,6 +610,11 @@
         updateSingleChart();
         renderDetails();
         expandChart();
+
+        // On mobile, scroll to chart since it's not fixed
+        if (isMobile()) {
+            document.querySelector(".chart-section").scrollIntoView({ behavior: "smooth", block: "start" });
+        }
     }
 
     window.__selectStock = selectStock;
@@ -1158,19 +1163,34 @@
         document.querySelector(".chart-section").classList.remove("expanded");
     }
 
+    function isMobile() {
+        return window.innerWidth <= 768;
+    }
+
     function setupChartCollapse() {
         const section = document.querySelector(".chart-section");
         let collapseTimer = null;
 
         section.addEventListener("mouseenter", () => {
+            if (isMobile()) return;
             clearTimeout(collapseTimer);
             expandChart();
         });
 
         section.addEventListener("mouseleave", () => {
+            if (isMobile()) return;
             collapseTimer = setTimeout(() => {
                 collapseChart();
             }, 400);
+        });
+    }
+
+    function setupStatsMobileToggle() {
+        const btn = document.getElementById("statsMobileToggle");
+        btn.addEventListener("click", () => {
+            const bar = document.getElementById("statsBar");
+            bar.classList.toggle("mobile-expanded");
+            btn.textContent = bar.classList.contains("mobile-expanded") ? "数据 ▴" : "数据 ▾";
         });
     }
 
@@ -1182,6 +1202,7 @@
         setupIndexToggle();
         setupChartCollapse();
         setupTagFilter();
+        setupStatsMobileToggle();
 
         document.addEventListener("click", (e) => {
             if (!isIndexView && !e.target.closest(".stock-card") && !e.target.closest(".chart-section") && !e.target.closest(".filter-bar") && !e.target.closest(".stats-bar")) {
