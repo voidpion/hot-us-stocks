@@ -1,0 +1,36 @@
+name: 添加股票
+description: 申请添加新的股票到行情看板
+title: "添加股票: "
+labels: ["add-stock"]
+body:
+  - type: input
+    id: symbol
+    attributes:
+      label: 股票代码
+      description: 美股交易代码，如 PLTR
+      placeholder: PLTR
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: 股票名称
+      description: 公司名称
+      placeholder: Palantir
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: 分类
+      options:
+        - us_stocks (美股)
+        - cn_stocks (中概股)
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: 添加理由
+      description: 为什么需要跟踪这只股票？
+      placeholder: 热门科技股，近期关注度高...

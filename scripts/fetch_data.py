@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 import requests
 import urllib3
+import yaml
 
 # Disable SSL verification globally for environments with missing CA certificates
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -26,59 +27,13 @@ requests.Session.request = _patched_request
 
 import akshare as ak
 
-# US Major Indices (ETF proxies)
-INDICES = {
-    "SPY": "S&P 500",
-    "DIA": "Dow Jones",
-    "QQQ": "Nasdaq 100",
-}
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "stocks.yaml")
 
-US_STOCKS = {
-    # Magnificent 7
-    "AAPL": "Apple",
-    "MSFT": "Microsoft",
-    "GOOGL": "Alphabet",
-    "AMZN": "Amazon",
-    "NVDA": "NVIDIA",
-    "META": "Meta Platforms",
-    "TSLA": "Tesla",
-    # Semiconductor
-    "AMD": "AMD",
-    "AVGO": "Broadcom",
-    "INTC": "Intel",
-    "QCOM": "Qualcomm",
-    "MU": "Micron",
-    # Software & Cloud
-    "CRM": "Salesforce",
-    "ORCL": "Oracle",
-    "ADBE": "Adobe",
-    "NOW": "ServiceNow",
-    # Internet & Media
-    "NFLX": "Netflix",
-    "UBER": "Uber",
-    "ABNB": "Airbnb",
-    "SNAP": "Snap",
-    # Fintech & Payments
-    "V": "Visa",
-    "PYPL": "PayPal",
-    "SQ": "Block",
-    "COIN": "Coinbase",
-}
 
-CN_STOCKS = {
-    "BABA": "阿里巴巴",
-    "PDD": "拼多多",
-    "JD": "京东",
-    "BIDU": "百度",
-    "NIO": "蔚来",
-    "XPEV": "小鹏汽车",
-    "LI": "理想汽车",
-    "TME": "腾讯音乐",
-    "BILI": "哔哩哔哩",
-    "IQ": "爱奇艺",
-    "ZH": "知乎",
-    "FUTU": "富途控股",
-}
+def load_stock_config() -> dict:
+    """Load stock lists from config/stocks.yaml."""
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 
@@ -363,6 +318,11 @@ def fetch_news() -> list[dict]:
 
 
 def main():
+    config = load_stock_config()
+    INDICES = config.get("indices", {})
+    US_STOCKS = config.get("us_stocks", {})
+    CN_STOCKS = config.get("cn_stocks", {})
+
     indices = fetch_group(INDICES, "US Indices")
     us_stocks = fetch_group(US_STOCKS, "US Stocks")
     cn_stocks = fetch_group(CN_STOCKS, "Chinese ADRs")

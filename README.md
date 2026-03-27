@@ -36,9 +36,24 @@ python -m http.server 8888
 
 浏览器打开 http://localhost:8888
 
+## 添加股票
+
+股票列表维护在 [`config/stocks.yaml`](config/stocks.yaml)，通过 PR 添加新股票：
+
+1. Fork 本仓库
+2. 编辑 `config/stocks.yaml`，在对应分类下添加一行：
+   ```yaml
+   us_stocks:
+     PLTR: "Palantir"    # 新增
+   ```
+3. 提交 PR — CI 会自动校验股票代码是否有效（绿色 ✅ 才可合并）
+4. 审核通过后 merge，下次构建自动生效
+
+也可以通过 [Issue](../../issues/new/choose) 提交添加请求。
+
 ## 自动部署
 
-GitHub Actions 每天北京时间 8:00 自动拉取最新行情数据并部署到 GitHub Pages。也可在 Actions 页面手动触发。
+GitHub Actions 每天北京时间 8:30 自动拉取最新行情数据并部署到 GitHub Pages。也可在 Actions 页面手动触发。
 
 ## License
 
