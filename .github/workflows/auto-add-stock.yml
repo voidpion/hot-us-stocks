@@ -1,0 +1,64 @@
+name: Auto Add Stock from Issue
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  add-stock:
+    if: contains(github.event.issue.labels.*.name, 'add-stock')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install pyyaml requests
+
+      - name: Parse issue and add stock
+        id: add
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: python3 scripts/add_stock_from_issue.py
+
+      - name: Commit and push
+        if: steps.add.outputs.added == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add config/stocks.yaml
+          git commit -m "feat: add ${{ steps.add.outputs.symbol }} via issue #${{ github.event.issue.number }}"
+          git push
+
+      - name: Comment on issue
+        if: steps.add.outputs.added == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `✅ 已自动添加 **${{ steps.add.outputs.symbol }}** (${{ steps.add.outputs.name }}) 到 \`${{ steps.add.outputs.group }}\`，下次构建生效。`
+            });
+
+      - name: Comment on failure
+        if: steps.add.outputs.added == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ 自动添加失败：${{ steps.add.outputs.reason }}`
+            });
