@@ -272,7 +272,7 @@ header .updated-time {
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    max-height: 96px;
+    max-height: 120px;
     overflow-y: auto;
 }
 
@@ -293,6 +293,7 @@ header .updated-time {
     gap: 8px;
     min-width: 0;
     overflow: hidden;
+    align-self: stretch;
 }
 
 .news-label {
@@ -312,9 +313,9 @@ header .updated-time {
     flex: 1;
     overflow: hidden;
     position: relative;
-    height: 72px;
-    mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 90%, transparent 100%);
-    -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 90%, transparent 100%);
+    min-height: 48px;
+    mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 8%, black 92%, transparent 100%);
 }
 
 .news-scroll {
